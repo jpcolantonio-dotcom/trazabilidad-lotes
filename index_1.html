@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Trazabilidad de Lotes</title>
+<meta name="theme-color" content="#1a1a1a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Trazabilidad"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.2/tesseract.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg2:#f5f5f4;--bg3:#eeede9;--text:#1a1a1a;--text2:#6b6b6b;--text3:#bbb;--border:rgba(0,0,0,.10);--border2:rgba(0,0,0,.20);--radius:8px;--radius-lg:12px;--green:#1D9E75;--green-bg:#E1F5EE;--blue:#378ADD;--blue-bg:#E6F1FB;--amber:#BA7517;--amber-bg:#FAEEDA;--red:#E24B4A;--red-bg:#FCEBEB}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1b;--bg2:#262624;--bg3:#2e2e2c;--text:#f0efec;--text2:#999;--text3:#555;--border:rgba(255,255,255,.10);--border2:rgba(255,255,255,.20)}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh}
+header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;gap:10px}
+.logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.logo i{color:var(--blue);font-size:20px}
+.logo .sub{font-weight:400;font-size:12px;color:var(--text2)}
+select,input,textarea{font-family:inherit}
+.emp-select{padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);max-width:160px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;flex-shrink:0}
+.status-dot.online{background:var(--green)}.status-dot.saving{background:var(--amber);animation:pulse .8s infinite}.status-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.main{max-width:720px;margin:0 auto;padding:1rem}
+.card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:.85rem}
+.btn{padding:8px 14px;font-size:13px;font-weight:500;border:.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text);display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--bg2)}.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-primary{background:var(--text);color:var(--bg);border-color:var(--text)}.btn-primary:hover{opacity:.85;background:var(--text)}
+.btn-primary:disabled{background:var(--border2);color:var(--text2);border-color:var(--border2)}
+.btn-pdf{background:var(--green);color:#fff;border-color:var(--green)}.btn-pdf:hover{opacity:.85;background:var(--green)}
+.btn-pdf:disabled{background:var(--border2);color:var(--text2);border-color:var(--border2)}
+.btn-danger{color:var(--red);border-color:rgba(226,75,74,.3)}.btn-danger:hover{background:var(--red-bg)}
+.btn-block{width:100%;justify-content:center}
+.field{margin-bottom:.6rem}
+.field label{display:block;font-size:12px;color:var(--text2);margin-bottom:3px}
+.field input,.field select{width:100%;padding:8px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem;gap:8px}
+h1{font-size:16px;font-weight:600}
+.tanda-card{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer}
+.tanda-card:hover{background:var(--bg2)}
+.tanda-main{min-width:0}
+.tanda-prod{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tanda-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;background:var(--bg2);color:var(--text2);white-space:nowrap;flex-shrink:0}
+.badge-ok{background:var(--green-bg);color:#0F6E56}
+.badge-warn{background:var(--amber-bg);color:#854F0B}
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--text2);font-size:13px}
+.empty i{font-size:30px;display:block;margin-bottom:8px;color:var(--text3)}
+.back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;margin-bottom:.75rem}
+.back:hover{color:var(--text)}
+.tanda-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.tanda-head-title{font-size:18px;font-weight:700;margin-bottom:2px}
+.tanda-head-sub{font-size:12px;color:var(--text2)}
+.mp-block{border:.5px solid var(--border);border-radius:var(--radius-lg);padding:.8rem;margin-bottom:.6rem;background:var(--bg)}
+.mp-block-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:.4rem}
+.mp-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+.lote-card{display:flex;gap:10px;padding:.55rem;border:.5px solid var(--border);border-radius:var(--radius);margin-top:.45rem;background:var(--bg2)}
+.lote-foto{width:56px;height:56px;border-radius:var(--radius);object-fit:cover;flex-shrink:0;cursor:pointer;background:var(--bg3)}
+.lote-info{flex:1;min-width:0}
+.lote-inputs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lote-inputs input{padding:5px 7px;font-size:12.5px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)}
+.lote-actions{display:flex;gap:4px;align-items:flex-start;flex-shrink:0}
+.icon-btn{width:28px;height:28px;border-radius:50%;border:.5px solid var(--border2);background:var(--bg);color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:13px}
+.icon-btn:hover{background:var(--bg2);color:var(--text)}
+.icon-btn.danger:hover{color:var(--red);border-color:rgba(226,75,74,.3);background:var(--red-bg)}
+.ocr-toggle{font-size:11px;color:var(--text2);cursor:pointer;margin-top:5px;display:inline-flex;align-items:center;gap:3px}
+.ocr-raw{font-size:11px;color:var(--text2);background:var(--bg);border:.5px solid var(--border);border-radius:6px;padding:6px 8px;margin-top:5px;white-space:pre-wrap;word-break:break-word;display:none}
+.foto-preview-wrap{text-align:center;margin:.6rem 0}
+.foto-preview{max-width:100%;max-height:260px;border-radius:var(--radius);border:.5px solid var(--border)}
+.ocr-status{font-size:12.5px;color:var(--text2);display:flex;align-items:center;justify-content:center;gap:7px;margin:.5rem 0}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--text2);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.alert{padding:9px 13px;border-radius:var(--radius);font-size:12.5px;margin-bottom:.75rem;display:flex;align-items:center;gap:7px}
+.alert-info{background:var(--blue-bg);color:#185FA5}
+.alert-err{background:var(--red-bg);color:#A32D2D}
+.alert-ok{background:var(--green-bg);color:#0F6E56}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:1000;padding:1.5rem}
+.lightbox.open{display:flex}
+.lightbox img{max-width:100%;max-height:100%;border-radius:4px}
+.lightbox .close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer}
+.hidden{display:none!important}
+.text-muted{color:var(--text2);font-size:12px}
+.link-muted{color:var(--text2);font-size:12px;text-decoration:underline;cursor:pointer}
+.finalizar-box{position:sticky;bottom:0;background:var(--bg3);padding:.75rem 0 1rem}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><i class="ti ti-barcode"></i> Trazabilidad <span class="sub">de Lotes</span></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="status-dot" id="statusDot"></span>
+    <select class="emp-select" id="empSelect" onchange="cambiarEmpresa(this.value)"></select>
+  </div>
+</header>
+
+<div class="main" id="main">
+
+  <!-- ===== VISTA LISTA ===== -->
+  <div id="vistaLista">
+    <div class="toolbar">
+      <h1>Tandas de producción</h1>
+      <button class="btn btn-primary" onclick="toggleFormTanda(true)"><i class="ti ti-plus"></i> Nueva tanda</button>
+    </div>
+
+    <div class="card hidden" id="formTandaCard">
+      <div class="field"><label>Fecha</label><input id="ft-fecha" type="date" onchange="onCambioFechaForm()"/></div>
+
+      <div class="field">
+        <label>Producto</label>
+        <select id="ft-producto-select" onchange="onSeleccionProducto()"><option value="">Elegí una fecha...</option></select>
+      </div>
+      <div class="text-muted hidden" id="ft-sinplan-msg" style="margin:-.3rem 0 .6rem">No hay nada planificado para esta fecha en esta empresa. <span class="link-muted" onclick="forzarManual()">Cargar un producto a mano</span></div>
+      <div class="field hidden" id="ft-manual-wrap"><label>Producto (manual)</label><input id="ft-producto-manual" placeholder="Nombre del producto"/></div>
+
+      <div class="row2">
+        <div class="field"><label>Cantidad</label><input id="ft-cantidad" type="number" step="any" placeholder="250"/></div>
+        <div class="field"><label>Unidad</label><input id="ft-unidad" list="dl-unidades" placeholder="kg, docenas..."/><datalist id="dl-unidades">
+          <option value="kg"></option><option value="docenas"></option><option value="unidades"></option><option value="cajas"></option><option value="tandas"></option><option value="litros"></option>
+        </datalist></div>
+      </div>
+      <div class="text-muted hidden" id="ft-autoplan-msg" style="margin:-.3rem 0 .6rem">Cantidad tomada del Plan de Producción — la podés corregir si lo real fue distinto.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1" onclick="toggleFormTanda(false)">Cancelar</button>
+        <button class="btn btn-primary" style="flex:1" onclick="crearTanda()"><i class="ti ti-device-floppy"></i> Guardar</button>
+      </div>
+    </div>
+
+    <div id="listaTandas"></div>
+  </div>
+
+  <!-- ===== VISTA DETALLE DE TANDA ===== -->
+  <div id="vistaTanda" class="hidden">
+    <div class="back" onclick="volverALista()"><i class="ti ti-arrow-left"></i> Volver a tandas</div>
+
+    <div class="card">
+      <div class="tanda-head">
+        <div>
+          <div class="tanda-head-title" id="td-producto-view"></div>
+          <div class="tanda-head-sub" id="td-sub-view"></div>
+        </div>
+        <button class="icon-btn danger" onclick="borrarTandaActual()" title="Eliminar tanda"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>
+
+    <div id="recetaAlert"></div>
+
+    <div class="toolbar">
+      <h1>Materias primas de esta tanda</h1>
+    </div>
+    <div id="checklistMp"></div>
+    <div id="extrasMp"></div>
+    <div style="margin:.4rem 0 1rem">
+      <span class="link-muted" onclick="abrirFormMp(null)"><i class="ti ti-plus" style="font-size:11px"></i> agregar otro material (no está en la receta)</span>
+    </div>
+
+    <div class="finalizar-box" id="finalizarBox"></div>
+
+    <div class="card hidden" id="formMpCard">
+      <div class="field"><label>Materia prima</label><input id="fm-nombre" list="dl-mp" placeholder="Ej. Harina Tapera"/><datalist id="dl-mp"></datalist></div>
+
+      <div id="fm-sinFoto">
+        <input type="file" accept="image/*" capture="environment" id="fm-file" class="hidden" onchange="onFotoElegida(event)"/>
+        <button class="btn btn-block" onclick="document.getElementById('fm-file').click()"><i class="ti ti-camera"></i> Tomar / elegir foto de la etiqueta</button>
+      </div>
+
+      <div id="fm-conFoto" class="hidden">
+        <div class="foto-preview-wrap"><img id="fm-preview" class="foto-preview"/></div>
+        <div class="ocr-status" id="fm-ocrStatus"></div>
+        <div class="row2">
+          <div class="field"><label>Lote</label><input id="fm-lote" placeholder="(no detectado)"/></div>
+          <div class="field"><label>Vencimiento</label><input id="fm-venc" type="date"/></div>
+        </div>
+        <div class="ocr-toggle" id="fm-ocrToggle" onclick="toggleOcrRaw('fm')">ver texto leído por la cámara</div>
+        <div class="ocr-raw" id="fm-ocrRaw"></div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:.7rem">
+        <button class="btn" style="flex:1" onclick="cerrarFormMp()">Cancelar</button>
+        <button class="btn btn-primary" style="flex:1" id="fm-guardarBtn" onclick="guardarLote()" disabled><i class="ti ti-device-floppy"></i> Guardar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="lightbox" id="lightbox" onclick="cerrarLightbox()">
+  <div class="close" onclick="cerrarLightbox()"><i class="ti ti-x"></i></div>
+  <img id="lightboxImg"/>
+</div>
+
+<script>
+const SB='https://ugmjfvgjumpnvbfskcgl.supabase.co';
+const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
+const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
+const BUCKET='trazabilidad';
+const get=async(t,f='')=>{const r=await fetch(`${SB}/rest/v1/${t}?${f}`,{headers:H});if(!r.ok)throw new Error(await r.text());return r.json()};
+const ins=async(t,d)=>{const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()};
+const pat=async(t,id,d)=>{const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text())};
+const del=async(t,id)=>{const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H});if(!r.ok)throw new Error(await r.text())};
+
+async function subirFoto(blob,path){
+  const r=await fetch(`${SB}/storage/v1/object/${BUCKET}/${path}`,{method:'POST',headers:{apikey:SK,'Authorization':'Bearer '+SK,'Content-Type':'image/jpeg'},body:blob});
+  if(!r.ok)throw new Error(await r.text());
+  return `${SB}/storage/v1/object/public/${BUCKET}/${path}`;
+}
+async function borrarFoto(path){
+  if(!path)return;
+  try{await fetch(`${SB}/storage/v1/object/${BUCKET}/${path}`,{method:'DELETE',headers:{apikey:SK,'Authorization':'Bearer '+SK}});}catch(e){}
+}
+
+function ss(s){
+  const d=document.getElementById('statusDot');
+  d.className='status-dot'+(s?' '+s:'');
+}
+
+function normTxt(s){
+  return String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+const wk=d=>{const dt=new Date(d);dt.setHours(0,0,0,0);dt.setDate(dt.getDate()-((dt.getDay()+6)%7));return dt.toISOString().slice(0,10)};
+function diaIndex(fecha){return (new Date(fecha+'T00:00:00').getDay()+6)%7}
+
+// baja una receta a sus materias primas reales (sin receta propia), igual criterio que
+// "Consumo MP" en PAPO: si un ingrediente es a su vez un semielaborado con receta propia
+// (Tapa Criolla 15, Relleno A, Cebolla Cubeteada...) sigue bajando hasta la materia prima real.
+function explotarAMateriasPrimas(recKeyInicial){
+  const vistos=new Set();
+  function rec(key,visitados,depth){
+    if(depth>15||visitados.has(key))return;
+    const sub=st.Rec[key];
+    if(sub&&sub.length){
+      const nv=new Set(visitados);nv.add(key);
+      sub.forEach(si=>rec(si.ingrediente,nv,depth+1));
+    }else{
+      vistos.add(key);
+    }
+  }
+  rec(recKeyInicial,new Set(),0);
+  return [...vistos].sort((a,b)=>a.localeCompare(b,'es'));
+}
+function buscarRecetaKey(producto){
+  if(!producto)return null;
+  if(st.Rec[producto]&&st.Rec[producto].length)return producto;
+  const norm=normTxt(producto);
+  const k=Object.keys(st.Rec).find(k=>normTxt(k)===norm&&st.Rec[k]&&st.Rec[k].length);
+  return k||null;
+}
+
+// ---------- estado ----------
+let st={empresas:[],empresaId:null,productosAll:[],materiasPrimas:[],Rec:{},RecTanda:{},tandas:[],tandaActual:null,lotes:[],ocrWorker:null,fotoBlobPendiente:null,planOpciones:[],prefillMp:null};
+
+async function init(){
+  ss('saving');
+  try{st.empresas=await get('empresas','order=nombre.asc')}catch(e){st.empresas=[]}
+  const sel=document.getElementById('empSelect');
+  sel.innerHTML=st.empresas.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('');
+  if(st.empresas.length)st.empresaId=st.empresas[0].id;
+  try{
+    const[pr,mp,rr]=await Promise.all([
+      get('productos','order=nombre.asc'),
+      get('materias_primas','order=nombre.asc'),
+      get('recetas','select=datos,tandas')
+    ]);
+    st.productosAll=pr||[];st.materiasPrimas=mp||[];
+    st.Rec=(rr&&rr[0]&&rr[0].datos)||{};st.RecTanda=(rr&&rr[0]&&rr[0].tandas)||{};
+  }catch(e){st.productosAll=[];st.materiasPrimas=[];st.Rec={};st.RecTanda={}}
+  document.getElementById('ft-fecha').value=hoyLocal();
+  await cargarTandas();
+  renderDatalists();
+  renderListaTandas();
+  ss('online');
+}
+
+function hoyLocal(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function cambiarEmpresa(id){
+  st.empresaId=id;
+  renderDatalists();
+  cargarTandas().then(renderListaTandas);
+}
+
+function renderDatalists(){
+  const mps=[...new Set(st.materiasPrimas.filter(m=>(m.tipo||'mp')==='mp'||(m.tipo||'mp')==='insumos').map(m=>m.nombre))].sort((a,b)=>a.localeCompare(b,'es'));
+  const dlmp=document.getElementById('dl-mp');
+  if(dlmp)dlmp.innerHTML=mps.map(p=>`<option value="${p.replace(/"/g,'&quot;')}"></option>`).join('');
+}
+
+// ---------- tandas ----------
+async function cargarTandas(){
+  if(!st.empresaId){st.tandas=[];return}
+  try{
+    st.tandas=await get('trazabilidad_tandas',`empresa_id=eq.${st.empresaId}&order=fecha.desc,created_at.desc&limit=200`);
+  }catch(e){st.tandas=[]}
+  if(st.tandas.length){
+    try{
+      const ids=st.tandas.map(t=>t.id).join(',');
+      const lotes=await get('trazabilidad_lotes',`tanda_id=in.(${ids})&select=tanda_id,materia_prima`);
+      const porTanda={};
+      lotes.forEach(l=>{(porTanda[l.tanda_id]=porTanda[l.tanda_id]||[]).push(normTxt(l.materia_prima))});
+      st.tandas.forEach(t=>{
+        const nombres=porTanda[t.id]||[];
+        t._numLotes=nombres.length;
+        const recKey=buscarRecetaKey(t.producto);
+        if(recKey){
+          const req=explotarAMateriasPrimas(recKey);
+          const tenidos=new Set(nombres);
+          t._requeridos=req.length;
+          t._cubiertos=req.filter(r=>tenidos.has(normTxt(r))).length;
+        }else{
+          t._requeridos=0;t._cubiertos=0;
+        }
+      });
+    }catch(e){st.tandas.forEach(t=>{t._numLotes=0;t._requeridos=0;t._cubiertos=0})}
+  }
+}
+
+function toggleFormTanda(mostrar){
+  document.getElementById('formTandaCard').classList.toggle('hidden',!mostrar);
+  if(mostrar){
+    document.getElementById('ft-cantidad').value='';
+    document.getElementById('ft-unidad').value='';
+    document.getElementById('ft-fecha').value=hoyLocal();
+    document.getElementById('ft-manual-wrap').classList.add('hidden');
+    document.getElementById('ft-producto-manual').value='';
+    document.getElementById('ft-autoplan-msg').classList.add('hidden');
+    onCambioFechaForm();
+  }
+}
+
+async function onCambioFechaForm(){
+  const fecha=document.getElementById('ft-fecha').value;
+  const selEl=document.getElementById('ft-producto-select');
+  const sinPlanMsg=document.getElementById('ft-sinplan-msg');
+  sinPlanMsg.classList.add('hidden');
+  document.getElementById('ft-manual-wrap').classList.add('hidden');
+  if(!fecha||!st.empresaId){selEl.innerHTML='<option value="">Elegí una fecha...</option>';return}
+  selEl.innerHTML='<option value="">Buscando el plan...</option>';
+  st.planOpciones=await cargarPlanFecha(fecha);
+  if(!st.planOpciones.length){
+    selEl.innerHTML='<option value="">— nada planificado —</option><option value="__manual__">Cargar producto a mano</option>';
+    sinPlanMsg.classList.remove('hidden');
+  }else{
+    selEl.innerHTML='<option value="">Elegí un producto...</option>'+
+      st.planOpciones.map((o,i)=>`<option value="${i}">${esc(o.producto)}${o.area?' ('+esc(o.area)+')':''} — ${o.cantidad.toLocaleString('es-AR')}${o.unidad?' '+esc(o.unidad):''}</option>`).join('')+
+      '<option value="__manual__">Otro producto (no estaba planificado)</option>';
+  }
+  document.getElementById('ft-cantidad').value='';
+  document.getElementById('ft-unidad').value='';
+  document.getElementById('ft-autoplan-msg').classList.add('hidden');
+}
+
+async function cargarPlanFecha(fecha){
+  const semana=wk(new Date(fecha+'T00:00:00'));
+  const di=diaIndex(fecha);
+  let filas=[];
+  try{
+    const d=await get('planes',`semana=eq.${semana}&select=filas`);
+    filas=d.length?(d[0].filas||[]):[];
+  }catch(e){filas=[]}
+  return filas.filter(r=>r.empresa_id===st.empresaId&&r.days&&r.days[di]>0)
+    .map(r=>({producto:r.producto,area:r.area,cantidad:r.days[di],unidad:r.unidad||''}))
+    .sort((a,b)=>a.producto.localeCompare(b.producto,'es'));
+}
+
+function onSeleccionProducto(){
+  const v=document.getElementById('ft-producto-select').value;
+  const manualWrap=document.getElementById('ft-manual-wrap');
+  const autoMsg=document.getElementById('ft-autoplan-msg');
+  if(v==='__manual__'){
+    manualWrap.classList.remove('hidden');
+    document.getElementById('ft-cantidad').value='';
+    document.getElementById('ft-unidad').value='';
+    autoMsg.classList.add('hidden');
+    return;
+  }
+  manualWrap.classList.add('hidden');
+  if(v===''){autoMsg.classList.add('hidden');return}
+  const o=st.planOpciones[parseInt(v,10)];
+  if(!o)return;
+  document.getElementById('ft-cantidad').value=o.cantidad;
+  document.getElementById('ft-unidad').value=o.unidad;
+  autoMsg.classList.remove('hidden');
+}
+
+function forzarManual(){
+  document.getElementById('ft-producto-select').value='__manual__';
+  onSeleccionProducto();
+}
+
+async function crearTanda(){
+  const fecha=document.getElementById('ft-fecha').value||hoyLocal();
+  const selV=document.getElementById('ft-producto-select').value;
+  let producto='',area=null;
+  if(selV==='__manual__'){
+    producto=document.getElementById('ft-producto-manual').value.trim();
+  }else if(selV!==''){
+    const o=st.planOpciones[parseInt(selV,10)];
+    if(o){producto=o.producto;area=o.area||null}
+  }
+  const cantidad=document.getElementById('ft-cantidad').value;
+  const unidad=document.getElementById('ft-unidad').value.trim();
+  if(!producto){alert('Falta elegir o escribir el producto.');return}
+  if(!st.empresaId){alert('No hay empresa seleccionada.');return}
+  ss('saving');
+  try{
+    const r=await ins('trazabilidad_tandas',{empresa_id:st.empresaId,producto,area,cantidad:cantidad?parseFloat(cantidad):null,unidad:unidad||null,fecha});
+    toggleFormTanda(false);
+    await cargarTandas();
+    renderListaTandas();
+    ss('online');
+    abrirTanda(r[0]);
+  }catch(e){ss('error');alert('No se pudo guardar la tanda: '+e.message)}
+}
+
+function renderListaTandas(){
+  const el=document.getElementById('listaTandas');
+  if(!st.tandas.length){
+    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Todavía no hay tandas cargadas para esta empresa.</div>`;
+    return;
+  }
+  el.innerHTML=st.tandas.map(t=>{
+    const fecha=new Date(t.fecha+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const cant=t.cantidad!=null?`${t.cantidad.toLocaleString('es-AR')}${t.unidad?' '+t.unidad:''}`:'';
+    let badge;
+    if(t.completada_at){
+      badge=`<span class="badge badge-ok"><i class="ti ti-check"></i> Completa</span>`;
+    }else if(t._requeridos>0){
+      const cls=t._cubiertos>=t._requeridos?'badge badge-ok':'badge badge-warn';
+      badge=`<span class="${cls}"><i class="ti ti-photo"></i> ${t._cubiertos}/${t._requeridos}</span>`;
+    }else{
+      badge=`<span class="badge"><i class="ti ti-photo"></i> ${t._numLotes||0}</span>`;
+    }
+    return `<div class="card tanda-card" onclick='abrirTandaPorId("${t.id}")'>
+      <div class="tanda-main">
+        <div class="tanda-prod">${esc(t.producto)}</div>
+        <div class="tanda-sub">${fecha}${cant?' · '+esc(cant):''}</div>
+      </div>
+      ${badge}
+    </div>`;
+  }).join('');
+}
+
+function abrirTandaPorId(id){
+  const t=st.tandas.find(x=>x.id===id);
+  if(t)abrirTanda(t);
+}
+
+async function abrirTanda(t){
+  st.tandaActual=t;
+  document.getElementById('vistaLista').classList.add('hidden');
+  document.getElementById('vistaTanda').classList.remove('hidden');
+  cerrarFormMp();
+  renderTandaHead();
+  await cargarLotes();
+  renderDetalleMp();
+  window.scrollTo(0,0);
+}
+
+function volverALista(){
+  document.getElementById('vistaTanda').classList.add('hidden');
+  document.getElementById('vistaLista').classList.remove('hidden');
+  cargarTandas().then(renderListaTandas);
+}
+
+function renderTandaHead(){
+  const t=st.tandaActual;
+  const fecha=new Date(t.fecha+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const cant=t.cantidad!=null?`${t.cantidad.toLocaleString('es-AR')}${t.unidad?' '+t.unidad:''}`:'sin cantidad cargada';
+  document.getElementById('td-producto-view').textContent=t.producto;
+  document.getElementById('td-sub-view').textContent=`${fecha} · ${cant}${t.area?' · '+t.area:''}`;
+}
+
+async function borrarTandaActual(){
+  if(!confirm(`¿Eliminar la tanda "${st.tandaActual.producto}" y todas sus fotos de lote? No se puede deshacer.`))return;
+  ss('saving');
+  try{
+    for(const l of st.lotes){if(l.foto_path)await borrarFoto(l.foto_path)}
+    await del('trazabilidad_tandas',st.tandaActual.id);
+    ss('online');
+    volverALista();
+  }catch(e){ss('error');alert('No se pudo eliminar: '+e.message)}
+}
+
+// ---------- lotes ----------
+async function cargarLotes(){
+  try{
+    st.lotes=await get('trazabilidad_lotes',`tanda_id=eq.${st.tandaActual.id}&order=created_at.asc`);
+  }catch(e){st.lotes=[]}
+}
+
+function renderDetalleMp(){
+  const t=st.tandaActual;
+  const recKey=buscarRecetaKey(t.producto);
+  const alertEl=document.getElementById('recetaAlert');
+  const checklistEl=document.getElementById('checklistMp');
+  const extrasEl=document.getElementById('extrasMp');
+  const finalizarEl=document.getElementById('finalizarBox');
+
+  const porNombre={};
+  st.lotes.forEach(l=>{const k=normTxt(l.materia_prima);(porNombre[k]=porNombre[k]||[]).push(l)});
+
+  if(recKey){
+    alertEl.innerHTML='';
+    const requeridos=explotarAMateriasPrimas(recKey);
+    const usados=new Set();
+    let cubiertos=0;
+    checklistEl.innerHTML=requeridos.map(nombre=>{
+      const k=normTxt(nombre);
+      usados.add(k);
+      const lts=porNombre[k]||[];
+      if(lts.length)cubiertos++;
+      const estado=lts.length?`<span class="badge badge-ok"><i class="ti ti-check"></i> ${lts.length>1?lts.length+' fotos':'listo'}</span>`:`<span class="badge badge-warn"><i class="ti ti-camera"></i> pendiente</span>`;
+      return `<div class="mp-block">
+        <div class="mp-block-head">
+          <div class="mp-name">${esc(nombre)} ${estado}</div>
+          <button class="btn btn-sm" onclick="abrirFormMp('${escJs(nombre)}')"><i class="ti ti-camera-plus"></i> foto</button>
+        </div>
+        ${lts.map(l=>loteCardHtml(l)).join('')}
+      </div>`;
+    }).join('');
+
+    // materiales extra: lotes cargados que no corresponden a ningún ingrediente de la receta
+    const extras=st.lotes.filter(l=>!usados.has(normTxt(l.materia_prima)));
+    extrasEl.innerHTML=extras.length?`<div class="text-muted" style="margin:.5rem 0 .3rem">Materiales extra (fuera de la receta)</div>`+
+      Object.values(extras.reduce((acc,l)=>{const k=normTxt(l.materia_prima);(acc[k]=acc[k]||{nombre:l.materia_prima,lts:[]}).lts.push(l);return acc},{}))
+      .map(g=>`<div class="mp-block"><div class="mp-block-head"><div class="mp-name">${esc(g.nombre)}</div></div>${g.lts.map(l=>loteCardHtml(l)).join('')}</div>`).join('')
+      :'';
+
+    const completa=requeridos.length>0&&cubiertos>=requeridos.length;
+    if(t.completada_at){
+      finalizarEl.innerHTML=`<div class="alert alert-ok"><i class="ti ti-circle-check"></i> Tanda marcada como completa. <span class="link-muted" style="margin-left:auto" onclick="reabrirTanda()">reabrir</span></div>`;
+    }else{
+      finalizarEl.innerHTML=`<button class="btn btn-pdf btn-block" ${completa?'':'disabled'} onclick="finalizarTanda()"><i class="ti ti-circle-check"></i> ${completa?'Finalizar tanda':'Faltan '+(requeridos.length-cubiertos)+' foto(s)'}</button>`;
+    }
+  }else{
+    alertEl.innerHTML=`<div class="alert alert-info"><i class="ti ti-info-circle"></i> "${esc(t.producto)}" no tiene receta cargada en PAPO — agregá las materias primas a mano con "agregar otro material".</div>`;
+    checklistEl.innerHTML='';
+    const grupos=Object.values(st.lotes.reduce((acc,l)=>{const k=normTxt(l.materia_prima);(acc[k]=acc[k]||{nombre:l.materia_prima,lts:[]}).lts.push(l);return acc},{}));
+    extrasEl.innerHTML=grupos.length?grupos.map(g=>`<div class="mp-block"><div class="mp-block-head"><div class="mp-name">${esc(g.nombre)}</div></div>${g.lts.map(l=>loteCardHtml(l)).join('')}</div>`).join('')
+      :`<div class="empty"><i class="ti ti-camera-off"></i>Todavía no cargaste ninguna materia prima para esta tanda.</div>`;
+    if(t.completada_at){
+      finalizarEl.innerHTML=`<div class="alert alert-ok"><i class="ti ti-circle-check"></i> Tanda marcada como completa. <span class="link-muted" style="margin-left:auto" onclick="reabrirTanda()">reabrir</span></div>`;
+    }else{
+      finalizarEl.innerHTML=`<button class="btn btn-pdf btn-block" onclick="finalizarTanda()"><i class="ti ti-circle-check"></i> Marcar tanda como completa</button>`;
+    }
+  }
+}
+
+function loteCardHtml(l){
+  const ocrId='ocr_'+l.id;
+  return `<div class="lote-card">
+    <img class="lote-foto" src="${l.foto_url||''}" onclick="abrirLightbox('${l.foto_url}')"/>
+    <div class="lote-info">
+      <div class="lote-inputs">
+        <input value="${esc(l.lote||'')}" placeholder="Lote" onblur="actualizarLote('${l.id}','lote',this.value)"/>
+        <input type="date" value="${l.vencimiento||''}" onblur="actualizarLote('${l.id}','vencimiento',this.value)"/>
+      </div>
+      ${l.ocr_texto?`<div class="ocr-toggle" onclick="toggleOcrRawId('${ocrId}')">ver texto leído por la cámara</div><div class="ocr-raw" id="${ocrId}">${esc(l.ocr_texto)}</div>`:''}
+    </div>
+    <div class="lote-actions">
+      <div class="icon-btn danger" onclick="borrarLote('${l.id}')" title="Eliminar"><i class="ti ti-trash"></i></div>
+    </div>
+  </div>`;
+}
+
+function toggleOcrRawId(id){
+  const el=document.getElementById(id);
+  if(el)el.style.display=el.style.display==='block'?'none':'block';
+}
+
+async function actualizarLote(id,campo,valor){
+  const l=st.lotes.find(x=>x.id===id);
+  if(!l)return;
+  const nuevo=campo==='vencimiento'?(valor||null):valor;
+  if(l[campo]===nuevo)return;
+  ss('saving');
+  try{
+    await pat('trazabilidad_lotes',id,{[campo]:nuevo});
+    l[campo]=nuevo;
+    ss('online');
+  }catch(e){ss('error');alert('No se pudo guardar: '+e.message)}
+}
+
+async function borrarLote(id){
+  const l=st.lotes.find(x=>x.id===id);
+  if(!l)return;
+  if(!confirm(`¿Eliminar la foto/lote de "${l.materia_prima}"?`))return;
+  ss('saving');
+  try{
+    if(l.foto_path)await borrarFoto(l.foto_path);
+    await del('trazabilidad_lotes',id);
+    st.lotes=st.lotes.filter(x=>x.id!==id);
+    renderDetalleMp();
+    cargarTandas();
+    ss('online');
+  }catch(e){ss('error');alert('No se pudo eliminar: '+e.message)}
+}
+
+async function finalizarTanda(){
+  ss('saving');
+  try{
+    const ahora=new Date().toISOString();
+    await pat('trazabilidad_tandas',st.tandaActual.id,{completada_at:ahora});
+    st.tandaActual.completada_at=ahora;
+    renderDetalleMp();
+    ss('online');
+  }catch(e){ss('error');alert('No se pudo marcar como completa: '+e.message)}
+}
+async function reabrirTanda(){
+  ss('saving');
+  try{
+    await pat('trazabilidad_tandas',st.tandaActual.id,{completada_at:null});
+    st.tandaActual.completada_at=null;
+    renderDetalleMp();
+    ss('online');
+  }catch(e){ss('error');alert('No se pudo reabrir: '+e.message)}
+}
+
+// ---------- agregar materia prima (foto + OCR) ----------
+function abrirFormMp(nombrePrefill){
+  document.getElementById('formMpCard').classList.remove('hidden');
+  const nombreEl=document.getElementById('fm-nombre');
+  if(nombrePrefill){nombreEl.value=nombrePrefill;nombreEl.readOnly=true}
+  else{nombreEl.value='';nombreEl.readOnly=false}
+  document.getElementById('fm-sinFoto').classList.remove('hidden');
+  document.getElementById('fm-conFoto').classList.add('hidden');
+  document.getElementById('fm-guardarBtn').disabled=true;
+  st.fotoBlobPendiente=null;
+  document.getElementById('formMpCard').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cerrarFormMp(){
+  document.getElementById('formMpCard').classList.add('hidden');
+  st.fotoBlobPendiente=null;
+}
+
+async function comprimirImagen(file,maxDim,calidad){
+  maxDim=maxDim||1600;calidad=calidad||0.82;
+  let bitmap;
+  try{bitmap=await createImageBitmap(file)}
+  catch(e){
+    bitmap=await new Promise((res,rej)=>{
+      const img=new Image();
+      img.onload=()=>res(img);
+      img.onerror=rej;
+      img.src=URL.createObjectURL(file);
+    });
+  }
+  let w=bitmap.width||bitmap.naturalWidth,h=bitmap.height||bitmap.naturalHeight;
+  if(w>maxDim||h>maxDim){
+    const r=Math.min(maxDim/w,maxDim/h);
+    w=Math.round(w*r);h=Math.round(h*r);
+  }
+  const canvas=document.createElement('canvas');
+  canvas.width=w;canvas.height=h;
+  canvas.getContext('2d').drawImage(bitmap,0,0,w,h);
+  return new Promise(res=>canvas.toBlob(b=>res(b),'image/jpeg',calidad));
+}
+
+async function onFotoElegida(ev){
+  const file=ev.target.files[0];
+  if(!file)return;
+  document.getElementById('fm-sinFoto').classList.add('hidden');
+  document.getElementById('fm-conFoto').classList.remove('hidden');
+  document.getElementById('fm-lote').value='';
+  document.getElementById('fm-venc').value='';
+  document.getElementById('fm-ocrRaw').textContent='';
+  document.getElementById('fm-ocrToggle').style.display='none';
+  document.getElementById('fm-ocrRaw').style.display='none';
+  document.getElementById('fm-guardarBtn').disabled=true;
+
+  const ocrStatus=document.getElementById('fm-ocrStatus');
+  ocrStatus.innerHTML=`<span class="spinner"></span> Procesando foto...`;
+
+  try{
+    const blob=await comprimirImagen(file);
+    st.fotoBlobPendiente=blob;
+    document.getElementById('fm-preview').src=URL.createObjectURL(blob);
+
+    ocrStatus.innerHTML=`<span class="spinner"></span> Leyendo la etiqueta...`;
+    const texto=await leerEtiqueta(blob);
+    const{lote,venc}=parsearOCR(texto);
+    document.getElementById('fm-lote').value=lote;
+    document.getElementById('fm-venc').value=venc;
+    document.getElementById('fm-ocrRaw').textContent=texto.trim()||'(no se detectó texto)';
+    document.getElementById('fm-ocrToggle').style.display='inline-flex';
+    ocrStatus.innerHTML=(lote||venc)
+      ?`<i class="ti ti-check" style="color:var(--green)"></i> Completá o corregí los datos antes de guardar.`
+      :`<i class="ti ti-alert-triangle" style="color:var(--amber)"></i> No se pudo leer lote/vencimiento solo. Completalo a mano.`;
+  }catch(e){
+    ocrStatus.innerHTML=`<i class="ti ti-alert-triangle" style="color:var(--amber)"></i> No se pudo leer la foto automáticamente. Completá lote y vencimiento a mano.`;
+  }
+  document.getElementById('fm-guardarBtn').disabled=false;
+}
+
+async function leerEtiqueta(blob){
+  if(!st.ocrWorker){st.ocrWorker=await Tesseract.createWorker('spa')}
+  const{data}=await st.ocrWorker.recognize(blob);
+  return data.text||'';
+}
+
+function toggleOcrRaw(prefix){
+  const el=document.getElementById(prefix+'-ocrRaw');
+  el.style.display=el.style.display==='block'?'none':'block';
+}
+
+function fechaISO(d,m,y){
+  d=parseInt(d,10);m=parseInt(m,10);y=parseInt(y,10);
+  if(y<100)y+=(y<50?2000:1900);
+  if(!(m>=1&&m<=12)||!(d>=1&&d<=31))return '';
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+function parsearOCR(textoOriginal){
+  const T=(textoOriginal||'').toUpperCase();
+  let venc='',lote='';
+
+  let m=T.match(/F\.?\s*V\.?\s*[:\.]?\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(!m)m=T.match(/VENC[A-ZÁÉÍÓÚ]*\.?\s*[:\.]?\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m)venc=fechaISO(m[1],m[2],m[3]);
+
+  if(!venc){
+    const MESES={ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,SET:9,OCT:10,NOV:11,DIC:12,JAN:1,APR:4,AUG:8,DEC:12};
+    const m2=T.match(/(\d{1,2})\s*([A-Z]{3})\s*(\d{4})/);
+    if(m2&&MESES[m2[2]])venc=fechaISO(m2[1],MESES[m2[2]],m2[3]);
+  }
+
+  if(!venc){
+    const m3=T.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if(m3)venc=fechaISO(m3[1],m3[2],m3[3]);
+  }
+
+  let ml=T.match(/LOTE\.?\s*[:\.]?\s*([0-9A-Z][0-9A-Z \-]{2,22})/);
+  if(!ml)ml=T.match(/\bL\.?\s*[:\.]\s*([0-9A-Z][0-9A-Z \-]{2,22})/);
+  if(ml)lote=ml[1].trim().split(/\n/)[0].trim().replace(/\s{2,}/g,' ');
+
+  return{lote,venc,textoCrudo:textoOriginal};
+}
+
+async function guardarLote(){
+  const nombre=document.getElementById('fm-nombre').value.trim();
+  if(!nombre){alert('Falta el nombre de la materia prima.');return}
+  const lote=document.getElementById('fm-lote').value.trim();
+  const venc=document.getElementById('fm-venc').value||null;
+  const ocrTexto=document.getElementById('fm-ocrRaw').textContent||'';
+
+  document.getElementById('fm-guardarBtn').disabled=true;
+  document.getElementById('fm-guardarBtn').innerHTML=`<span class="spinner"></span> Guardando...`;
+  ss('saving');
+  try{
+    let fotoUrl=null,fotoPath=null;
+    if(st.fotoBlobPendiente){
+      fotoPath=`${st.tandaActual.id}/${Date.now()}_${slug(nombre)}.jpg`;
+      fotoUrl=await subirFoto(st.fotoBlobPendiente,fotoPath);
+    }
+    const r=await ins('trazabilidad_lotes',{
+      tanda_id:st.tandaActual.id,materia_prima:nombre,foto_url:fotoUrl,foto_path:fotoPath,
+      lote:lote||null,vencimiento:venc,ocr_texto:ocrTexto||null
+    });
+    st.lotes.push(r[0]);
+    renderDetalleMp();
+    cerrarFormMp();
+    cargarTandas();
+    ss('online');
+  }catch(e){
+    ss('error');
+    alert('No se pudo guardar: '+e.message);
+    document.getElementById('fm-guardarBtn').disabled=false;
+    document.getElementById('fm-guardarBtn').innerHTML=`<i class="ti ti-device-floppy"></i> Guardar`;
+  }
+}
+
+function slug(s){
+  return(s||'mp').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'').slice(0,40)||'mp';
+}
+
+function abrirLightbox(url){
+  if(!url)return;
+  document.getElementById('lightboxImg').src=url;
+  document.getElementById('lightbox').classList.add('open');
+}
+function cerrarLightbox(){document.getElementById('lightbox').classList.remove('open')}
+
+function esc(s){return(s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function escJs(s){return(s==null?'':String(s)).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+
+init();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{})});
+}
+</script>
+</body>
+</html>
