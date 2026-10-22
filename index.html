@@ -70,6 +70,14 @@ h1{font-size:16px;font-weight:600}
 .gal-prod{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gal-sub{font-size:11.5px;color:var(--text2);margin-top:2px}
 .gal-del{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;border:none}
+.back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;margin-bottom:.6rem}
+.back:hover{color:var(--text)}
+.prod-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;padding:12px 14px;margin-bottom:8px;border:.5px solid var(--border2);border-radius:var(--radius-lg);background:var(--bg);cursor:pointer;font-family:inherit;color:var(--text)}
+.prod-btn:hover{background:var(--bg2)}
+.prod-btn-nombre{font-size:14px;font-weight:600}
+.prod-btn-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.prod-btn-icon{font-size:19px;color:var(--text3);flex-shrink:0}
+.prod-btn-manual{border-style:dashed;color:var(--text2)}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:1000;padding:1.5rem}
 .lightbox.open{display:flex}
 .lightbox img{max-width:100%;max-height:100%;border-radius:4px}
@@ -97,15 +105,20 @@ h1{font-size:16px;font-weight:600}
   <div id="vistaCargar">
     <div class="card">
       <div class="field"><label>Fecha</label><input id="ft-fecha" type="date" onchange="onCambioFechaForm()"/></div>
+    </div>
 
-      <div class="field">
-        <label>Producto</label>
-        <select id="ft-producto-select" onchange="onSeleccionProducto()"><option value="">Elegí una fecha...</option></select>
-      </div>
-      <div class="text-muted hidden" id="ft-sinplan-msg" style="margin:-.3rem 0 .6rem">No hay nada planificado para esta fecha en esta empresa. <span class="link-muted" onclick="forzarManual()">Cargar un producto a mano</span></div>
-      <div class="field hidden" id="ft-manual-wrap"><label>Producto (manual)</label><input id="ft-producto-manual" placeholder="Nombre del producto" oninput="onManualChange()"/></div>
+    <div id="ft-grid-wrap">
+      <div class="toolbar"><h1>Producción de hoy</h1></div>
+      <div id="ft-producto-botones"></div>
+      <div class="text-muted hidden" id="ft-sinplan-msg" style="margin:-.3rem 0 .6rem">No hay nada planificado para esta fecha en esta empresa.</div>
+    </div>
 
-      <div id="ft-detalle" class="hidden">
+    <div id="ft-detalle" class="hidden">
+      <div class="back" onclick="volverAGrid()"><i class="ti ti-arrow-left"></i> Volver a productos</div>
+      <div class="card">
+        <div class="field hidden" id="ft-manual-wrap"><label>Producto (manual)</label><input id="ft-producto-manual" placeholder="Nombre del producto" oninput="onManualChange()"/></div>
+        <div id="ft-producto-elegido-head" style="font-size:16px;font-weight:700;margin-bottom:.7rem"></div>
+
         <div class="row2">
           <div class="field"><label>Cantidad</label><input id="ft-cantidad" type="number" step="any" placeholder="300"/></div>
           <div class="field"><label>Unidad</label><input id="ft-unidad" list="dl-unidades" placeholder="docenas, kg..."/><datalist id="dl-unidades">
@@ -234,69 +247,77 @@ async function cargarPlanFecha(fecha){
 
 async function onCambioFechaForm(){
   const fecha=document.getElementById('ft-fecha').value;
-  const selEl=document.getElementById('ft-producto-select');
+  const botonesEl=document.getElementById('ft-producto-botones');
   const sinPlanMsg=document.getElementById('ft-sinplan-msg');
+  volverAGrid();
+  document.getElementById('ft-ok').innerHTML='';
+  st.productoElegido=null;st.areaElegida=null;
   sinPlanMsg.classList.add('hidden');
-  document.getElementById('ft-manual-wrap').classList.add('hidden');
-  resetDetalle();
-  if(!fecha||!st.empresaId){selEl.innerHTML='<option value="">Elegí una fecha...</option>';return}
-  selEl.innerHTML='<option value="">Buscando el plan...</option>';
+  if(!fecha||!st.empresaId){botonesEl.innerHTML='<div class="text-muted">Elegí una fecha...</div>';return}
+  botonesEl.innerHTML='<div class="text-muted">Buscando el plan...</div>';
   st.planOpciones=await cargarPlanFecha(fecha);
   if(!st.planOpciones.length){
-    selEl.innerHTML='<option value="">— nada planificado —</option><option value="__manual__">Cargar producto a mano</option>';
+    botonesEl.innerHTML=productoBotonManualHtml();
     sinPlanMsg.classList.remove('hidden');
   }else{
-    selEl.innerHTML='<option value="">Elegí un producto...</option>'+
-      st.planOpciones.map((o,i)=>`<option value="${i}">${esc(o.producto)}${o.area?' ('+esc(o.area)+')':''} — ${o.cantidad.toLocaleString('es-AR')}${o.unidad?' '+esc(o.unidad):''}</option>`).join('')+
-      '<option value="__manual__">Otro producto (no estaba planificado)</option>';
+    botonesEl.innerHTML=st.planOpciones.map((o,i)=>productoBotonHtml(i,o)).join('')+productoBotonManualHtml();
   }
 }
 
-function resetDetalle(){
-  document.getElementById('ft-detalle').classList.add('hidden');
-  document.getElementById('ft-cantidad').value='';
-  document.getElementById('ft-unidad').value='';
-  document.getElementById('ft-autoplan-msg').classList.add('hidden');
-  document.getElementById('ft-sinFoto').classList.remove('hidden');
-  document.getElementById('ft-conFoto').classList.add('hidden');
-  document.getElementById('ft-guardarBtn').disabled=true;
-  st.fotoBlobPendiente=null;
-  st.productoElegido=null;st.areaElegida=null;
+function productoBotonHtml(i,o){
+  return `<button type="button" class="prod-btn" onclick="elegirProducto(${i})">
+    <div>
+      <div class="prod-btn-nombre">${esc(o.producto)}</div>
+      <div class="prod-btn-sub">${o.area?esc(o.area)+' · ':''}${o.cantidad.toLocaleString('es-AR')}${o.unidad?' '+esc(o.unidad):''}</div>
+    </div>
+    <i class="ti ti-camera prod-btn-icon"></i>
+  </button>`;
+}
+function productoBotonManualHtml(){
+  return `<button type="button" class="prod-btn prod-btn-manual" onclick="elegirProducto('manual')">
+    <div class="prod-btn-nombre">Otro producto (no estaba planificado)</div>
+    <i class="ti ti-plus prod-btn-icon"></i>
+  </button>`;
 }
 
-function onSeleccionProducto(){
-  const v=document.getElementById('ft-producto-select').value;
+function volverAGrid(){
+  document.getElementById('ft-detalle').classList.add('hidden');
+  document.getElementById('ft-grid-wrap').classList.remove('hidden');
+}
+
+function elegirProducto(v){
+  document.getElementById('ft-grid-wrap').classList.add('hidden');
+  document.getElementById('ft-detalle').classList.remove('hidden');
   const manualWrap=document.getElementById('ft-manual-wrap');
+  const head=document.getElementById('ft-producto-elegido-head');
   const autoMsg=document.getElementById('ft-autoplan-msg');
-  const detalle=document.getElementById('ft-detalle');
-  if(v===''){manualWrap.classList.add('hidden');detalle.classList.add('hidden');return}
-  if(v==='__manual__'){
+  resetFotoParcial();
+  if(v==='manual'){
     manualWrap.classList.remove('hidden');
+    head.textContent='';
     document.getElementById('ft-producto-manual').value='';
     document.getElementById('ft-cantidad').value='';
     document.getElementById('ft-unidad').value='';
     autoMsg.classList.add('hidden');
     st.productoElegido=null;st.areaElegida=null;
-    detalle.classList.add('hidden');
-    resetFotoParcial();
+    document.getElementById('ft-producto-manual').focus();
+    window.scrollTo(0,0);
     return;
   }
   manualWrap.classList.add('hidden');
-  const o=st.planOpciones[parseInt(v,10)];
+  const o=st.planOpciones[v];
   if(!o)return;
+  head.textContent=o.producto+(o.area?' ('+o.area+')':'');
   document.getElementById('ft-cantidad').value=o.cantidad;
   document.getElementById('ft-unidad').value=o.unidad;
   autoMsg.classList.remove('hidden');
   st.productoElegido=o.producto;st.areaElegida=o.area||null;
-  detalle.classList.remove('hidden');
-  resetFotoParcial();
+  window.scrollTo(0,0);
 }
 
 function onManualChange(){
   const nombre=document.getElementById('ft-producto-manual').value.trim();
   st.productoElegido=nombre||null;st.areaElegida=null;
-  document.getElementById('ft-detalle').classList.toggle('hidden',!nombre);
-  if(nombre)resetFotoParcial();
 }
 
 function resetFotoParcial(){
@@ -308,8 +329,7 @@ function resetFotoParcial(){
 }
 
 function forzarManual(){
-  document.getElementById('ft-producto-select').value='__manual__';
-  onSeleccionProducto();
+  elegirProducto('manual');
 }
 
 // ---------- foto + OCR ----------
@@ -435,10 +455,9 @@ async function guardarFoto(){
       foto_url:fotoUrl,foto_path:fotoPath,fecha_detectada:fechaDet,ocr_texto:ocrTexto||null
     });
     ss('online');
+    volverAGrid();
     document.getElementById('ft-ok').innerHTML=`<div class="alert alert-ok"><i class="ti ti-circle-check"></i> Guardado: ${esc(producto)}${cantidad?' — '+esc(cantidad)+(unidad?' '+esc(unidad):''):''}</div>`;
-    document.getElementById('ft-producto-select').value='';
     document.getElementById('ft-manual-wrap').classList.add('hidden');
-    document.getElementById('ft-detalle').classList.add('hidden');
     st.fotoBlobPendiente=null;st.productoElegido=null;st.areaElegida=null;
   }catch(e){
     ss('error');
