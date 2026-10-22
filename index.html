@@ -74,10 +74,13 @@ h1{font-size:16px;font-weight:600}
 .back:hover{color:var(--text)}
 .prod-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;padding:12px 14px;margin-bottom:8px;border:.5px solid var(--border2);border-radius:var(--radius-lg);background:var(--bg);cursor:pointer;font-family:inherit;color:var(--text)}
 .prod-btn:hover{background:var(--bg2)}
+.prod-btn-row{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
 .prod-btn-nombre{font-size:14px;font-weight:600}
 .prod-btn-sub{font-size:12px;color:var(--text2);margin-top:2px}
 .prod-btn-icon{font-size:19px;color:var(--text3);flex-shrink:0}
 .prod-btn-manual{border-style:dashed;color:var(--text2)}
+.prod-btn-done{border-color:var(--green);background:var(--green-bg)}
+.prod-btn-thumb{width:38px;height:38px;border-radius:7px;object-fit:cover;flex-shrink:0;background:var(--bg3)}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:1000;padding:1.5rem}
 .lightbox.open{display:flex}
 .lightbox img{max-width:100%;max-height:100%;border-radius:4px}
@@ -197,7 +200,7 @@ const wk=d=>{const dt=new Date(d);dt.setHours(0,0,0,0);dt.setDate(dt.getDate()-(
 function diaIndex(fecha){return (new Date(fecha+'T00:00:00').getDay()+6)%7}
 
 // ---------- estado ----------
-let st={empresas:[],empresaId:null,planOpciones:[],fotoBlobPendiente:null,ocrWorker:null,galeria:[]};
+let st={empresas:[],empresaId:null,planOpciones:[],fotoBlobPendiente:null,ocrWorker:null,galeria:[],fotosHoy:[]};
 
 async function init(){
   ss('saving');
@@ -255,22 +258,50 @@ async function onCambioFechaForm(){
   sinPlanMsg.classList.add('hidden');
   if(!fecha||!st.empresaId){botonesEl.innerHTML='<div class="text-muted">Elegí una fecha...</div>';return}
   botonesEl.innerHTML='<div class="text-muted">Buscando el plan...</div>';
-  st.planOpciones=await cargarPlanFecha(fecha);
+  const[plan]=await Promise.all([cargarPlanFecha(fecha),cargarFotosFecha(fecha)]);
+  st.planOpciones=plan;
+  renderBotonesProducto();
+}
+
+// v3-addendum: "cuando a un producto le sacas la foto que ponga el botón en verde" -- fotosHoy
+// trae lo ya guardado hoy (empresa+fecha actuales) en trazabilidad_fotos, para que el botón de
+// cada producto planificado muestre si ya tiene foto (verde + miniatura) o todavía no (gris +
+// cámara). Se recarga al cambiar fecha/empresa y también justo después de guardar una foto.
+async function cargarFotosFecha(fecha){
+  if(!st.empresaId||!fecha){st.fotosHoy=[];return}
+  try{
+    st.fotosHoy=await get('trazabilidad_fotos',`empresa_id=eq.${st.empresaId}&fecha=eq.${fecha}&order=created_at.desc`);
+  }catch(e){st.fotosHoy=[]}
+}
+function buscarFotoProducto(nombre){
+  const n=normTxt(nombre);
+  return st.fotosHoy.find(f=>normTxt(f.producto)===n)||null;
+}
+
+function renderBotonesProducto(){
+  const botonesEl=document.getElementById('ft-producto-botones');
+  const sinPlanMsg=document.getElementById('ft-sinplan-msg');
   if(!st.planOpciones.length){
     botonesEl.innerHTML=productoBotonManualHtml();
     sinPlanMsg.classList.remove('hidden');
   }else{
     botonesEl.innerHTML=st.planOpciones.map((o,i)=>productoBotonHtml(i,o)).join('')+productoBotonManualHtml();
+    sinPlanMsg.classList.add('hidden');
   }
 }
 
 function productoBotonHtml(i,o){
-  return `<button type="button" class="prod-btn" onclick="elegirProducto(${i})">
-    <div>
-      <div class="prod-btn-nombre">${esc(o.producto)}</div>
-      <div class="prod-btn-sub">${o.area?esc(o.area)+' · ':''}${o.cantidad.toLocaleString('es-AR')}${o.unidad?' '+esc(o.unidad):''}</div>
+  const foto=buscarFotoProducto(o.producto);
+  const thumb=foto?`<img class="prod-btn-thumb" src="${foto.foto_url||''}"/>`:'';
+  return `<button type="button" class="prod-btn${foto?' prod-btn-done':''}" onclick="elegirProducto(${i})">
+    <div class="prod-btn-row">
+      ${thumb}
+      <div>
+        <div class="prod-btn-nombre">${esc(o.producto)}</div>
+        <div class="prod-btn-sub">${o.area?esc(o.area)+' · ':''}${o.cantidad.toLocaleString('es-AR')}${o.unidad?' '+esc(o.unidad):''}</div>
+      </div>
     </div>
-    <i class="ti ti-camera prod-btn-icon"></i>
+    <i class="ti ${foto?'ti-circle-check':'ti-camera'} prod-btn-icon" ${foto?'style="color:var(--green)"':''}></i>
   </button>`;
 }
 function productoBotonManualHtml(){
@@ -455,6 +486,8 @@ async function guardarFoto(){
       foto_url:fotoUrl,foto_path:fotoPath,fecha_detectada:fechaDet,ocr_texto:ocrTexto||null
     });
     ss('online');
+    await cargarFotosFecha(fecha);
+    renderBotonesProducto();
     volverAGrid();
     document.getElementById('ft-ok').innerHTML=`<div class="alert alert-ok"><i class="ti ti-circle-check"></i> Guardado: ${esc(producto)}${cantidad?' — '+esc(cantidad)+(unidad?' '+esc(unidad):''):''}</div>`;
     document.getElementById('ft-manual-wrap').classList.add('hidden');
